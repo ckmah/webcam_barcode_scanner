@@ -26,71 +26,77 @@ let VIDEO_WIDTH = 320;
 let VIDEO_HEIGHT = 240;
 var timeout = null;
 
-function toggleVideo() {
-  if (!streaming) {
-    const constraints = {
-      video: {
+const constraints = {
+    video: {
         // the browser will try to honor this resolution, but it may end up being lower.
         width: VIDEO_WIDTH,
         height: VIDEO_HEIGHT
-      }
-    };
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then(function (stream) {
-        videoInput.srcObject = stream;
+    }
+};
 
-        onVideoStarted();
-      })
-      .catch(function (err) {
-        console.log(err);
-      });
-  } else {
-    tracks = videoInput.srcObject.getTracks();
-    tracks.forEach(element => { element.stop() });
-    videoInput.srcObject = null;
-    onVideoStopped();
-  }
+function toggleVideo() {
+    if (!streaming) { // Start video stream and scan
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(function(stream) {
+                videoInput.srcObject = stream;
+                onVideoStarted();
+            })
+            .catch(function(err) {
+                console.log(err);
+            });
+    } else { // Stop video stream and stop scanning
+        tracks = videoInput.srcObject.getTracks();
+        tracks.forEach(element => { element.stop() });
+        videoInput.srcObject = null;
+        onVideoStopped();
+    }
 }
 
 function onVideoStarted() {
-  streaming = true;
-  startAndStop.innerText = 'Stop';
+    streaming = true;
+    startAndStop.innerText = 'Stop';
 
-  const track = videoInput.srcObject.getVideoTracks()[0];
-  const actualSettings = track.getSettings();
+    const track = videoInput.srcObject.getVideoTracks()[0];
+    const actualSettings = track.getSettings();
 
-  console.log(actualSettings.width, actualSettings.height)
-  videoInput.width = actualSettings.width;
-  videoInput.height = actualSettings.height;
-  scan(videoInput.srcObject);
+    console.log(actualSettings.width, actualSettings.height)
+    videoInput.width = actualSettings.width;
+    videoInput.height = actualSettings.height;
+    scan(2); // Scan at 2 frames per second
 }
 
 function onVideoStopped() {
-  streaming = false;
-  startAndStop.innerText = 'Start';
-  stop_scan();
+    streaming = false;
+    startAndStop.innerText = 'Start';
+    stop_scan();
 }
 
-function scan() {
+function scan(fps) {
 
-  // Draw image onto canvas
-  canvas.width = videoInput.width;
-  canvas.height = videoInput.height;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(videoInput, 0, 0, videoInput.width, videoInput.height);
+    // Draw image onto canvas
+    canvas.width = videoInput.width;
+    canvas.height = videoInput.height;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(videoInput, 0, 0, videoInput.width, videoInput.height);
 
-  // get the image data from the canvas
-  const image = ctx.getImageData(0, 0, videoInput.width, videoInput.height)
+    // get the image data from the canvas
+    const image = ctx.getImageData(0, 0, videoInput.width, videoInput.height)
 
-  var code = zbarProcessImageData(image);
+    // Identify all barcodes in image
+    var barcode_list = zbarProcessImageData(image);
 
-  console.log(code);
-  barcodeDisplay.innerHTML = code;
-  timeout = setTimeout(scan, 250);
+    // TODO do whatever with the barcodes
+    console.log(barcode_list);
+    barcodeDisplay.innerHTML = barcode_list;
+
+    console.log(1000 / fps);
+    timeout = setTimeout(function() { scan(fps) }, 1000 / fps); // Scanning rate
+
+    return barcode_list;
 }
 
 function stop_scan() {
-  clearTimeout(timeout);
+    clearTimeout(timeout);
 }
 
 startAndStop.addEventListener('click', () => toggleVideo());
